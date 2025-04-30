@@ -22,7 +22,12 @@ recognition.start();
 
 // اجرای مجدد پس از پایان هر سیکل شنیدن
 // Restarting recognition after each session ends
-recognition.addEventListener("end", recognition.start);
+// recognition.addEventListener("end", recognition.start);
+
+recognition.addEventListener("end", () => {
+  console.log("🔁 Restarting recognition...");
+  setTimeout(() => recognition.start(), 50); // تأخیر کوچک برای جلوگیری از خطا
+});
 
 // اضافه کردن لیسنر برای دریافت نتایج گفتار
 // Adding an event listener to handle speech recognition results
