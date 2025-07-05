@@ -30,3 +30,31 @@ body.gray
     border-radius: 10px;
     box-shadow: 0 10px 10px 0 rgba(0, 0, 0, 0.2);
 }
+
+#preview-box {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    padding: 16px 32px;
+    border-radius: 16px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.15);
+    color: #333;
+    font-size: 1.2rem;
+    z-index: 9999;
+}
+
+#speak-box {
+    margin-top: 32px;
+    text-align: center;
+}
+#speak-box button {
+    padding: 10px 24px;
+    font-size: 1.1rem;
+    border-radius: 8px;
+    border: none;
+    background: #1976d2;
+    color: #fff;
+    cursor: pointer;
+}

@@ -1,7 +1,8 @@
 // تعریف یک شیء برای استفاده از SpeechRecognition یا webkitSpeechRecognition
 // Defining a SpeechRecognition object or its webkit alternative
-window.SpeechRecognitionAlternative =
-  window.SpeechRecognitionAlternative || window.webkitSpeechRecognition;
+window.SpeechRecognition =
+  window.SpeechRecognition || window.webkitSpeechRecognition;
+const recognition = new SpeechRecognition();
 
 // انتخاب المان اصلی برای قرار دادن متن و تعریف پاراگراف و اسپن برای نمایش متن
 // Selecting the main container element and defining a paragraph and span for displaying text
@@ -10,9 +11,51 @@ let p = document.createElement("p");
 p.setAttribute("contenteditable", "true"); // قابلیت ویرایش پاراگراف
 let span = document.createElement("span");
 
+let pendingTranscript = ""; // بافر موقت برای متن تشخیص داده‌شده
+
+// فقط یک دیو برای پیش‌نمایش ایجاد کن
+let previewBox = document.createElement("div");
+previewBox.id = "preview-box";
+previewBox.style.position = "fixed";
+previewBox.style.bottom = "30px";
+previewBox.style.left = "50%";
+previewBox.style.transform = "translateX(-50%)";
+previewBox.style.background = "#fff";
+previewBox.style.padding = "16px 32px";
+previewBox.style.borderRadius = "16px";
+previewBox.style.boxShadow = "0 2px 16px rgba(0,0,0,0.15)";
+previewBox.style.color = "#333";
+previewBox.style.fontSize = "1.2rem";
+previewBox.style.zIndex = "9999";
+document.body.appendChild(previewBox);
+
+// حذف preview قبلی (اگر لازم است)
+if (document.getElementById("preview")) {
+  document.getElementById("preview").remove();
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && pendingTranscript.trim() !== "") {
+    let confirmedSpan = document.createElement("span");
+    confirmedSpan.textContent = pendingTranscript + " ";
+    p.appendChild(confirmedSpan);
+    container.appendChild(p);
+
+    // پاک کردن کامل previewBox و آماده‌سازی برای شنیدن بعدی
+    previewBox.textContent = "";
+    pendingTranscript = "";
+
+    recognition.abort(); // متوقف کردن recognition فعلی
+    setTimeout(() => recognition.start(), 100); // شروع مجدد recognition با تاخیر کوتاه
+
+    e.preventDefault();
+  }
+});
+
+
 // ایجاد نمونه‌ای از SpeechRecognition و تنظیم زبان به فارسی
 // Creating an instance of SpeechRecognition and setting the language to Persian
-const recognition = new SpeechRecognitionAlternative();
+// const recognition = new SpeechRecognitionAlternative();
 recognition.lang = "fa-IR";
 recognition.interimResults = true; // فعال کردن نتایج موقت
 
@@ -26,7 +69,7 @@ recognition.start();
 
 recognition.addEventListener("end", () => {
   console.log("🔁 Restarting recognition...");
-  setTimeout(() => recognition.start(), 50); // تأخیر کوچک برای جلوگیری از خطا
+  setTimeout(() => recognition.start(), 1); // تأخیر کوچک برای جلوگیری از خطا
 });
 
 // اضافه کردن لیسنر برای دریافت نتایج گفتار
@@ -39,9 +82,9 @@ recognition.addEventListener("result", (event) => {
   // پردازش نتایج گفتار به متن
   // Processing speech-to-text results
   let transcript = Array.from(event.results)
-    .map((result) => result[0]) // انتخاب اولین نتیجه
-    .map((result) => result.transcript) // تبدیل نتیجه به متن
-    .join(" "); // اتصال متن‌ها
+    .map((result) => result[0])
+    .map((result) => result.transcript)
+    .join(" ");
 
   // تبدیل کلمه "علامت سوال" به علامت سوال (؟)
   // Replacing the phrase "علامت سوال" with the actual question mark (?)
@@ -122,10 +165,66 @@ recognition.addEventListener("result", (event) => {
 
   // اضافه کردن متن به اسپن و پاراگراف
   // Adding the transcript to the span and paragraph
-  span.textContent = transcript + " ";
-  p.appendChild(span);
+
+  pendingTranscript = transcript;
+  previewBox.textContent = pendingTranscript; // فقط اینجا مقدار previewBox را به‌روزرسانی کن
 
   // نمایش متن در کنسول برای تست و دیباگ
   // Logging the transcript in the console for debugging
-  console.log(transcript);
+  // console.log(transcript);
 });
+
+// ایجاد دکمه یا دیو برای خواندن متن
+let speakBox = document.createElement("div");
+speakBox.id = "speak-box";
+speakBox.style.marginTop = "32px";
+speakBox.style.textAlign = "center";
+
+let speakBtn = document.createElement("button");
+speakBtn.textContent = "🔊 خواندن متن";
+speakBtn.style.padding = "10px 24px";
+speakBtn.style.fontSize = "1.1rem";
+speakBtn.style.borderRadius = "8px";
+speakBtn.style.border = "none";
+speakBtn.style.background = "#1976d2";
+speakBtn.style.color = "#fff";
+speakBtn.style.cursor = "pointer";
+
+speakBox.appendChild(speakBtn);
+container.parentNode.insertBefore(speakBox, container.nextSibling);
+
+// تابع خواندن متن با استفاده از ResponsiveVoice (پشتیبانی از فارسی)
+function speakText() {
+  let text = Array.from(container.querySelectorAll('p'))
+    .map(p => p.innerText || p.textContent)
+    .join(' ');
+  if (!text.trim()) return;
+
+  // اگر زبان فعلی فارسی است، از ResponsiveVoice استفاده کن
+  if (recognition.lang === 'fa-IR' && window.responsiveVoice) {
+    responsiveVoice.speak(text, "Persian Female");
+  } else {
+    // حالت پیش‌فرض: Web Speech API
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+    }
+    let utter = new SpeechSynthesisUtterance(text);
+    utter.lang = recognition.lang;
+    let setVoice = () => {
+      let voices = window.speechSynthesis.getVoices();
+      if (recognition.lang === 'en-US') {
+        let enVoice = voices.find(v => v.lang && v.lang.startsWith('en'));
+        if (enVoice) utter.voice = enVoice;
+      }
+      window.speechSynthesis.speak(utter);
+    };
+    if (window.speechSynthesis.getVoices().length === 0) {
+      window.speechSynthesis.addEventListener('voiceschanged', setVoice, { once: true });
+      window.speechSynthesis.getVoices();
+    } else {
+      setVoice();
+    }
+  }
+}
+
+speakBtn.addEventListener("click", speakText);
