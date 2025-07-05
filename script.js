@@ -193,6 +193,7 @@ speakBtn.style.cursor = "pointer";
 speakBox.appendChild(speakBtn);
 container.parentNode.insertBefore(speakBox, container.nextSibling);
 
+
 // تابع خواندن متن با استفاده از ResponsiveVoice (پشتیبانی از فارسی)
 function speakText() {
   let text = Array.from(container.querySelectorAll('p'))
