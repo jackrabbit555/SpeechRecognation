@@ -116,6 +116,8 @@ recognition.addEventListener("result", (event) => {
     p.appendChild(span);
   }
 
+
+
   // تغییر رنگ صفحه به نارنجی در صورت تشخیص فرمان "صفحه نارنجی"
   // Changing page color to orange on "صفحه نارنجی" command
   if (transcript.includes("صفحه نارنجی")) {
@@ -174,6 +176,49 @@ recognition.addEventListener("result", (event) => {
   // console.log(transcript);
 });
 
+// ایجاد دیو وضعیت پایین صفحه
+let statusBox = document.createElement("div");
+statusBox.id = "status-box";
+statusBox.style.position = "fixed";
+statusBox.style.bottom = "0";
+statusBox.style.left = "0";
+statusBox.style.width = "100%";
+statusBox.style.background = "#222";
+statusBox.style.color = "#fff";
+statusBox.style.textAlign = "center";
+statusBox.style.padding = "8px 0";
+statusBox.style.fontSize = "1rem";
+statusBox.style.zIndex = "10000";
+statusBox.textContent = "🎤 در حال گوش دادن...";
+document.body.appendChild(statusBox);
+
+recognition.addEventListener("start", () => {
+  statusBox.textContent = "🎤 در حال گوش دادن...";
+});
+
+recognition.addEventListener("result", (event) => {
+  // ...existing code...
+  if (event.results[0].isFinal) {
+    statusBox.textContent = "✅ جمله ثبت شد. منتظر جمله جدید...";
+  } else {
+    statusBox.textContent = "📝 منتظر تایید شما (Enter) یا ادامه صحبت...";
+  }
+  // ...existing code...
+});
+
+recognition.addEventListener("end", () => {
+  statusBox.textContent = "⏸️ شنیدن متوقف شد، آماده شروع مجدد...";
+  setTimeout(() => recognition.start(), 1);
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && pendingTranscript.trim() !== "") {
+    // ...existing code...
+    statusBox.textContent = "🎤 در حال گوش دادن...";
+    // ...existing code...
+  }
+});
+
 // ایجاد دکمه یا دیو برای خواندن متن
 let speakBox = document.createElement("div");
 speakBox.id = "speak-box";
@@ -194,37 +239,38 @@ speakBox.appendChild(speakBtn);
 container.parentNode.insertBefore(speakBox, container.nextSibling);
 
 
-// تابع خواندن متن با استفاده از ResponsiveVoice (پشتیبانی از فارسی)
+// تابع خواندن متن با مدیریت کامل صداها
 function speakText() {
+  if (window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+  }
   let text = Array.from(container.querySelectorAll('p'))
     .map(p => p.innerText || p.textContent)
     .join(' ');
   if (!text.trim()) return;
 
-  // اگر زبان فعلی فارسی است، از ResponsiveVoice استفاده کن
-  if (recognition.lang === 'fa-IR' && window.responsiveVoice) {
-    responsiveVoice.speak(text, "Persian Female");
+  let utter = new SpeechSynthesisUtterance(text);
+  utter.lang = recognition.lang;
+
+  // انتخاب صدای مناسب پس از بارگذاری صداها
+  let setVoice = () => {
+    let voices = window.speechSynthesis.getVoices();
+    if (recognition.lang === 'fa-IR') {
+      let faVoice = voices.find(v => v.lang && v.lang.startsWith('fa'));
+      if (faVoice) utter.voice = faVoice;
+    } else if (recognition.lang === 'en-US') {
+      let enVoice = voices.find(v => v.lang && v.lang.startsWith('en'));
+      if (enVoice) utter.voice = enVoice;
+    }
+    window.speechSynthesis.speak(utter);
+  };
+
+  // اگر صداها هنوز بارگذاری نشده‌اند
+  if (window.speechSynthesis.getVoices().length === 0) {
+    window.speechSynthesis.addEventListener('voiceschanged', setVoice, { once: true });
+    window.speechSynthesis.getVoices(); // تریگر بارگذاری
   } else {
-    // حالت پیش‌فرض: Web Speech API
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
-    }
-    let utter = new SpeechSynthesisUtterance(text);
-    utter.lang = recognition.lang;
-    let setVoice = () => {
-      let voices = window.speechSynthesis.getVoices();
-      if (recognition.lang === 'en-US') {
-        let enVoice = voices.find(v => v.lang && v.lang.startsWith('en'));
-        if (enVoice) utter.voice = enVoice;
-      }
-      window.speechSynthesis.speak(utter);
-    };
-    if (window.speechSynthesis.getVoices().length === 0) {
-      window.speechSynthesis.addEventListener('voiceschanged', setVoice, { once: true });
-      window.speechSynthesis.getVoices();
-    } else {
-      setVoice();
-    }
+    setVoice();
   }
 }
 
