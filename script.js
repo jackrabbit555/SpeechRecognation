@@ -1,258 +1,181 @@
-// تعریف یک شیء برای استفاده از SpeechRecognition یا webkitSpeechRecognition
-// Defining a SpeechRecognition object or its webkit alternative
-window.SpeechRecognition =
-  window.SpeechRecognition || window.webkitSpeechRecognition;
+// -------------------- Speech Recognition Setup --------------------
+window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const recognition = new SpeechRecognition();
+recognition.lang = "fa-IR";
+recognition.interimResults = true;
 
-// انتخاب المان اصلی برای قرار دادن متن و تعریف پاراگراف و اسپن برای نمایش متن
-// Selecting the main container element and defining a paragraph and span for displaying text
-let container = document.querySelector(".container");
-let p = document.createElement("p");
-p.setAttribute("contenteditable", "true"); // قابلیت ویرایش پاراگراف
+// -------------------- DOM Elements & UI Setup --------------------
+const container = document.querySelector(".container");
+let p = createEditableParagraph();
 let span = document.createElement("span");
+let pendingTranscript = "";
 
-let pendingTranscript = ""; // بافر موقت برای متن تشخیص داده‌شده
-
-// فقط یک دیو برای پیش‌نمایش ایجاد کن
-let previewBox = document.createElement("div");
-previewBox.id = "preview-box";
-previewBox.style.position = "fixed";
-previewBox.style.bottom = "30px";
-previewBox.style.left = "50%";
-previewBox.style.transform = "translateX(-50%)";
-previewBox.style.background = "#fff";
-previewBox.style.padding = "16px 32px";
-previewBox.style.borderRadius = "16px";
-previewBox.style.boxShadow = "0 2px 16px rgba(0,0,0,0.15)";
-previewBox.style.color = "#333";
-previewBox.style.fontSize = "1.2rem";
-previewBox.style.zIndex = "9999";
+// Preview Box
+const previewBox = createPreviewBox();
 document.body.appendChild(previewBox);
 
-// حذف preview قبلی (اگر لازم است)
-if (document.getElementById("preview")) {
-  document.getElementById("preview").remove();
+// Status Bar
+const statusBox = createStatusBar();
+document.body.appendChild(statusBox);
+
+// Speak Button
+const speakBox = createSpeakBox();
+container.parentNode.insertBefore(speakBox, container.nextSibling);
+
+// Audio Visualizer
+const audioCanvas = createAudioVisualizerCanvas();
+document.body.insertBefore(audioCanvas, previewBox);
+startVisualizer(audioCanvas);
+
+// -------------------- Event Listeners --------------------
+document.addEventListener("keydown", handleEnterKey);
+recognition.addEventListener("start", () => setStatus("🎤 در حال گوش دادن..."));
+recognition.addEventListener("end", handleRecognitionEnd);
+recognition.addEventListener("result", handleRecognitionResult);
+speakBox.querySelector("button").addEventListener("click", speakText);
+
+// -------------------- Function Definitions --------------------
+function createEditableParagraph() {
+  const para = document.createElement("p");
+  para.setAttribute("contenteditable", "true");
+  return para;
 }
 
-document.addEventListener("keydown", (e) => {
+function createPreviewBox() {
+  const box = document.createElement("div");
+  box.id = "preview-box";
+  Object.assign(box.style, {
+    position: "fixed", bottom: "30px", left: "50%", transform: "translateX(-50%)",
+    background: "#fff", padding: "16px 32px", borderRadius: "16px",
+    boxShadow: "0 2px 16px rgba(0,0,0,0.15)", color: "#333", fontSize: "1.2rem", zIndex: 9999
+  });
+  return box;
+}
+
+function createStatusBar() {
+  const bar = document.createElement("div");
+  bar.id = "status-box";
+  Object.assign(bar.style, {
+    position: "fixed", bottom: "0", left: "0", width: "100%",
+    background: "#222", color: "#fff", textAlign: "center",
+    padding: "8px 0", fontSize: "1rem", zIndex: 10000
+  });
+  bar.textContent = "🎤 در حال گوش دادن...";
+  return bar;
+}
+
+function createSpeakBox() {
+  const box = document.createElement("div");
+  box.id = "speak-box";
+  box.style.marginTop = "32px";
+  box.style.textAlign = "center";
+  const btn = document.createElement("button");
+  btn.textContent = "🔊 خواندن متن";
+  Object.assign(btn.style, {
+    padding: "10px 24px", fontSize: "1.1rem", borderRadius: "8px",
+    border: "none", background: "#1976d2", color: "#fff", cursor: "pointer"
+  });
+  box.appendChild(btn);
+  return box;
+}
+
+function createAudioVisualizerCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.id = "audio-visualizer";
+  canvas.width = 600;
+  canvas.height = 60;
+  Object.assign(canvas.style, {
+    display: "block", margin: "24px auto 0 auto", background: "#222", borderRadius: "8px"
+  });
+  return canvas;
+}
+
+function setStatus(text) {
+  statusBox.textContent = text;
+}
+
+function handleEnterKey(e) {
   if (e.key === "Enter" && pendingTranscript.trim() !== "") {
-    let confirmedSpan = document.createElement("span");
+    const confirmedSpan = document.createElement("span");
     confirmedSpan.textContent = pendingTranscript + " ";
     p.appendChild(confirmedSpan);
     container.appendChild(p);
-
-    // پاک کردن کامل previewBox و آماده‌سازی برای شنیدن بعدی
     previewBox.textContent = "";
     pendingTranscript = "";
-
-    recognition.abort(); // متوقف کردن recognition فعلی
-    setTimeout(() => recognition.start(), 100); // شروع مجدد recognition با تاخیر کوتاه
-
+    setStatus("🎤 در حال گوش دادن...");
+    recognition.abort();
+    setTimeout(() => recognition.start(), 100);
     e.preventDefault();
   }
-});
+}
 
+function handleRecognitionEnd() {
+  setStatus("⏸️ شنیدن متوقف شد، آماده شروع مجدد...");
+  setTimeout(() => recognition.start(), 1);
+}
 
-// ایجاد نمونه‌ای از SpeechRecognition و تنظیم زبان به فارسی
-// Creating an instance of SpeechRecognition and setting the language to Persian
-// const recognition = new SpeechRecognitionAlternative();
-recognition.lang = "fa-IR";
-recognition.interimResults = true; // فعال کردن نتایج موقت
-
-// شروع شنیدن گفتار
-// Starting speech recognition
-recognition.start();
-
-// اجرای مجدد پس از پایان هر سیکل شنیدن
-// Restarting recognition after each session ends
-// recognition.addEventListener("end", recognition.start);
-
-recognition.addEventListener("end", () => {
-  console.log("🔁 Restarting recognition...");
-  setTimeout(() => recognition.start(), 1); // تأخیر کوچک برای جلوگیری از خطا
-});
-
-// اضافه کردن لیسنر برای دریافت نتایج گفتار
-// Adding an event listener to handle speech recognition results
-recognition.addEventListener("result", (event) => {
-  // افزودن پاراگراف به کانتینر
-  // Adding the paragraph to the container
+function handleRecognitionResult(event) {
   container.appendChild(p);
-
-  // پردازش نتایج گفتار به متن
-  // Processing speech-to-text results
   let transcript = Array.from(event.results)
-    .map((result) => result[0])
-    .map((result) => result.transcript)
+    .map(result => result[0])
+    .map(result => result.transcript)
     .join(" ");
-
-  // تبدیل کلمه "علامت سوال" به علامت سوال (؟)
-  // Replacing the phrase "علامت سوال" with the actual question mark (?)
-  if (transcript.includes("علامت سوال")) {
-    transcript = transcript.replace("علامت سوال", "?");
-  }
-
-  // شناسایی فرمان "خط بعدی" و افزودن پاراگراف جدید
-  // Handling the "خط بعدی" command to create a new paragraph
+  if (transcript.includes("علامت سوال")) transcript = transcript.replace("علامت سوال", "?");
   if (transcript.includes("خط بعدی") && event.results[0].isFinal) {
-    transcript = ""; // پاک کردن متن فعلی
-    p.setAttribute("contenteditable", "true"); // قابل ویرایش کردن متن جدید
-
-    p = document.createElement("p"); // ایجاد پاراگراف جدید
-    container.appendChild(p); // افزودن به کانتینر
+    transcript = "";
+    p = createEditableParagraph();
+    container.appendChild(p);
   }
-
-  // شناسایی فرمان "صفحه پاک شود" و پاک کردن محتوا
-  // Handling "صفحه پاک شود" command to clear the content
   if (transcript.includes("صفحه پاک شود") && event.results[0].isFinal) {
-    container.innerHTML = ""; // پاک کردن کانتینر
-    p.innerHTML = ""; // پاک کردن پاراگراف
+    container.innerHTML = "";
+    p.innerHTML = "";
   }
-
-  // افزودن اسپن جدید پس از اتمام نتیجه نهایی
-  // Adding a new span when the result is final
   if (event.results[0].isFinal) {
     span = document.createElement("span");
     p.appendChild(span);
-  }
-
-
-
-  // تغییر رنگ صفحه به نارنجی در صورت تشخیص فرمان "صفحه نارنجی"
-  // Changing page color to orange on "صفحه نارنجی" command
-  if (transcript.includes("صفحه نارنجی")) {
-    transcript = ""; // پاک کردن متن فعلی
-    document.body.classList.add("orange"); // اضافه کردن کلاس نارنجی
-  }
-
-  // تغییر رنگ صفحه به آبی در صورت تشخیص فرمان "صفحه آبی"
-  // Changing page color to blue on "صفحه آبی" command
-  if (transcript.includes("صفحه آبی")) {
-    transcript = ""; // پاک کردن متن فعلی
-    document.body.classList.add("blue"); // اضافه کردن کلاس آبی
-  }
-
-  // تغییر رنگ صفحه به خاکستری در صورت تشخیص فرمان "صفحه خاکستری"
-  // Changing page color to gray on "صفحه خاکستری" command
-  if (transcript.includes("صفحه خاکستری")) {
-    transcript = ""; // پاک کردن متن فعلی
-    document.body.classList.add("gray"); // اضافه کردن کلاس خاکستری
-  }
-
-  // تغییر زبان به انگلیسی با فرمان "انگلیسی تایپ کن"
-  // Switching to English language on "انگلیسی تایپ کن" command
-  if (transcript.includes("انگلیسی تایپ کن") && event.results[0].isFinal) {
-    recognition.stop(); // متوقف کردن تشخیص گفتار
-    recognition.lang = "en-US"; // تغییر زبان به انگلیسی
-    transcript = ""; // پاک کردن متن
-    p.setAttribute("contenteditable", "true"); // قابلیت ویرایش متن جدید
-
-    p = document.createElement("p"); // ایجاد پاراگراف جدید
-    p.setAttribute("dir", "ltr"); // تنظیم جهت چپ به راست
-    container.appendChild(p); // افزودن به کانتینر
-  }
-
-  // تغییر زبان به فارسی با فرمان "type in Persian"
-  // Switching back to Persian language on "type in Persian" command
-  if (transcript.includes("type in Persian") && event.results[0].isFinal) {
-    recognition.stop(); // متوقف کردن تشخیص گفتار
-    recognition.lang = "fa-IR"; // تغییر زبان به فارسی
-    transcript = ""; // پاک کردن متن
-    p.setAttribute("contenteditable", "true"); // قابلیت ویرایش متن جدید
-
-    p = document.createElement("p"); // ایجاد پاراگراف جدید
-    p.setAttribute("dir", "rtl"); // تنظیم جهت راست به چپ
-    container.appendChild(p); // افزودن به کانتینر
-  }
-
-  // اضافه کردن متن به اسپن و پاراگراف
-  // Adding the transcript to the span and paragraph
-
-  pendingTranscript = transcript;
-  previewBox.textContent = pendingTranscript; // فقط اینجا مقدار previewBox را به‌روزرسانی کن
-
-  // نمایش متن در کنسول برای تست و دیباگ
-  // Logging the transcript in the console for debugging
-  // console.log(transcript);
-});
-
-// ایجاد دیو وضعیت پایین صفحه
-let statusBox = document.createElement("div");
-statusBox.id = "status-box";
-statusBox.style.position = "fixed";
-statusBox.style.bottom = "0";
-statusBox.style.left = "0";
-statusBox.style.width = "100%";
-statusBox.style.background = "#222";
-statusBox.style.color = "#fff";
-statusBox.style.textAlign = "center";
-statusBox.style.padding = "8px 0";
-statusBox.style.fontSize = "1rem";
-statusBox.style.zIndex = "10000";
-statusBox.textContent = "🎤 در حال گوش دادن...";
-document.body.appendChild(statusBox);
-
-recognition.addEventListener("start", () => {
-  statusBox.textContent = "🎤 در حال گوش دادن...";
-});
-
-recognition.addEventListener("result", (event) => {
-  // ...existing code...
-  if (event.results[0].isFinal) {
-    statusBox.textContent = "✅ جمله ثبت شد. منتظر جمله جدید...";
+    setStatus("✅ جمله ثبت شد. منتظر جمله جدید...");
   } else {
-    statusBox.textContent = "📝 منتظر تایید شما (Enter) یا ادامه صحبت...";
+    setStatus("📝 منتظر تایید شما (Enter) یا ادامه صحبت...");
   }
-  // ...existing code...
-});
-
-recognition.addEventListener("end", () => {
-  statusBox.textContent = "⏸️ شنیدن متوقف شد، آماده شروع مجدد...";
-  setTimeout(() => recognition.start(), 1);
-});
-
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && pendingTranscript.trim() !== "") {
-    // ...existing code...
-    statusBox.textContent = "🎤 در حال گوش دادن...";
-    // ...existing code...
+  if (transcript.includes("صفحه نارنجی")) {
+    transcript = "";
+    document.body.classList.add("orange");
   }
-});
+  if (transcript.includes("صفحه آبی")) {
+    transcript = "";
+    document.body.classList.add("blue");
+  }
+  if (transcript.includes("صفحه خاکستری")) {
+    transcript = "";
+    document.body.classList.add("gray");
+  }
+  if (transcript.includes("انگلیسی تایپ کن") && event.results[0].isFinal) {
+    recognition.stop();
+    recognition.lang = "en-US";
+    transcript = "";
+    p = createEditableParagraph();
+    p.setAttribute("dir", "ltr");
+    container.appendChild(p);
+  }
+  if (transcript.includes("type in Persian") && event.results[0].isFinal) {
+    recognition.stop();
+    recognition.lang = "fa-IR";
+    transcript = "";
+    p = createEditableParagraph();
+    p.setAttribute("dir", "rtl");
+    container.appendChild(p);
+  }
+  pendingTranscript = transcript;
+  previewBox.textContent = pendingTranscript;
+}
 
-// ایجاد دکمه یا دیو برای خواندن متن
-let speakBox = document.createElement("div");
-speakBox.id = "speak-box";
-speakBox.style.marginTop = "32px";
-speakBox.style.textAlign = "center";
-
-let speakBtn = document.createElement("button");
-speakBtn.textContent = "🔊 خواندن متن";
-speakBtn.style.padding = "10px 24px";
-speakBtn.style.fontSize = "1.1rem";
-speakBtn.style.borderRadius = "8px";
-speakBtn.style.border = "none";
-speakBtn.style.background = "#1976d2";
-speakBtn.style.color = "#fff";
-speakBtn.style.cursor = "pointer";
-
-speakBox.appendChild(speakBtn);
-container.parentNode.insertBefore(speakBox, container.nextSibling);
-
-
-// تابع خواندن متن با مدیریت کامل صداها
 function speakText() {
-  if (window.speechSynthesis.speaking) {
-    window.speechSynthesis.cancel();
-  }
   let text = Array.from(container.querySelectorAll('p'))
     .map(p => p.innerText || p.textContent)
     .join(' ');
   if (!text.trim()) return;
-
   let utter = new SpeechSynthesisUtterance(text);
   utter.lang = recognition.lang;
-
-  // انتخاب صدای مناسب پس از بارگذاری صداها
   let setVoice = () => {
     let voices = window.speechSynthesis.getVoices();
     if (recognition.lang === 'fa-IR') {
@@ -264,14 +187,53 @@ function speakText() {
     }
     window.speechSynthesis.speak(utter);
   };
-
-  // اگر صداها هنوز بارگذاری نشده‌اند
   if (window.speechSynthesis.getVoices().length === 0) {
     window.speechSynthesis.addEventListener('voiceschanged', setVoice, { once: true });
-    window.speechSynthesis.getVoices(); // تریگر بارگذاری
+    window.speechSynthesis.getVoices();
   } else {
     setVoice();
   }
 }
 
-speakBtn.addEventListener("click", speakText);
+function startVisualizer(audioCanvas) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = audioCtx.createAnalyser();
+    const source = audioCtx.createMediaStreamSource(stream);
+    source.connect(analyser);
+    analyser.fftSize = 1024;
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    let lastDataArray = new Float32Array(bufferLength);
+    const smoothFactor = 0.85;
+    function draw() {
+      requestAnimationFrame(draw);
+      analyser.getByteTimeDomainData(dataArray);
+      const ctx = audioCanvas.getContext('2d');
+      ctx.clearRect(0, 0, audioCanvas.width, audioCanvas.height);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#00e676';
+      ctx.beginPath();
+      let sliceWidth = audioCanvas.width * 1.0 / bufferLength;
+      let x = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        let v = dataArray[i] / 128.0;
+        let y = v * audioCanvas.height / 2;
+        y = lastDataArray[i] * smoothFactor + y * (1 - smoothFactor);
+        lastDataArray[i] = y;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+        x += sliceWidth;
+      }
+      ctx.lineTo(audioCanvas.width, audioCanvas.height / 2);
+      ctx.stroke();
+    }
+    draw();
+  }).catch(() => {
+    audioCanvas.style.display = "none";
+  });
+}
+
+// -------------------- Start Recognition --------------------
+recognition.start();
