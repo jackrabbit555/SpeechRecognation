@@ -161,9 +161,20 @@ function handleRecognitionResult(event) {
     recognition.stop();
     recognition.lang = "fa-IR";
     transcript = "";
-    p = createEditableParagraph();
-    p.setAttribute("dir", "rtl");
-    container.appendChild(p);
+  }
+
+  // Replace common speech patterns
+  transcript = transcript.replace(/علامت سوال/g, "?");
+  transcript = transcript.replace(/نقطه/g, ".");
+  transcript = transcript.replace(/ویرگول/g, ",");
+
+  if (event.results[0].isFinal) {
+    if (currentActiveField && transcript.trim()) {
+      currentActiveField.value += transcript + " ";
+      saveToLocalStorage();
+      setStatus(
+        "✅ متن اضافه شد. فیلد فعال: " + getFieldName(currentActiveField)
+      );
   }
   pendingTranscript = transcript;
   previewBox.textContent = pendingTranscript;
